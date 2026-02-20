@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}老師批改台{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>&#x1F4DA; 老師批改台</h1>
+  <p>所有學生的作答紀錄</p>
+</div>
+
+{% if not submissions %}
+<div class="card empty-state">
+  <p>&#x1F4ED; 目前還沒有學生作答</p>
+  <p style="font-size: 15px; margin-top: 8px;">學生提交練習後，就會出現在這裡</p>
+</div>
+{% else %}
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>學生</th>
+          <th>練習類型</th>
+          <th>提交時間</th>
+          <th>狀態</th>
+          <th>AI 評等</th>
+          <th>審閱</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in submissions %}
+        <tr>
+          <td><strong>{{ item.submission.student_name }}</strong></td>
+          <td>{{ item.questionnaire_name }}</td>
+          <td>{{ item.submission.created_at.strftime('%m/%d %H:%M') }}</td>
+          <td>
+            {% if item.submission.status == "completed" %}
+              <span class="badge badge-success">已完成</span>
+            {% elif item.submission.status == "grading" %}
+              <span class="badge badge-warning">評分中</span>
+            {% elif item.submission.status == "error" %}
+              <span class="badge badge-danger">錯誤</span>
+            {% else %}
+              <span class="badge badge-muted">等待中</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if item.overall_quality %}
+              {% if item.overall_quality == "優秀" %}
+                <span class="badge badge-success">{{ item.overall_quality }}</span>
+              {% elif item.overall_quality == "良好" %}
+                <span class="badge badge-info">{{ item.overall_quality }}</span>
+              {% elif item.overall_quality == "普通" %}
+                <span class="badge badge-muted">{{ item.overall_quality }}</span>
+              {% else %}
+                <span class="badge badge-warning">{{ item.overall_quality }}</span>
+              {% endif %}
+            {% else %}
+              <span style="color: var(--text-light);">-</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if item.reviewed %}
+              <span class="badge badge-success">已審閱</span>
+            {% else %}
+              <span class="badge badge-muted">未審閱</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="/teacher/{{ item.submission.id }}" class="btn btn-sm btn-secondary">查看詳情</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

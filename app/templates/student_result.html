@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}練習結果{% endblock %}
+
+{% block content %}
+{% if error is defined and error %}
+<div class="alert alert-error">{{ error }}</div>
+<a href="/" class="btn btn-secondary">回到首頁</a>
+
+{% else %}
+<div class="page-header">
+  <h1>{{ submission.student_name }} 的練習結果</h1>
+  <p>{{ questionnaire_name }}</p>
+</div>
+
+<div class="card">
+  <h2>&#x1F4DD; 你的答案</h2>
+  <div class="answer-display">
+    {% if submission.questionnaire_id == "emotion_abc" %}
+      <div class="answer-field">
+        <div class="answer-label">發生了什麼事？（事件）</div>
+        <div class="answer-value">{{ answers.event | default('') }}</div>
+      </div>
+      <div class="answer-field">
+        <div class="answer-label">你當時的感覺（情緒）</div>
+        <div class="answer-value">{{ answers.emotion | default('') }}</div>
+      </div>
+      <div class="answer-field">
+        <div class="answer-label">你心裡在想什麼？（想法）</div>
+        <div class="answer-value">{{ answers.thought | default('') }}</div>
+      </div>
+    {% elif submission.questionnaire_id == "eq_thought_handle" %}
+      <div class="answer-field">
+        <div class="answer-label">發生了什麼事？（事件）</div>
+        <div class="answer-value">{{ answers.event | default('') }}</div>
+      </div>
+      {% if answers.emotion_slots is defined %}
+      <div class="answer-label" style="margin-top: 14px;">情緒轉盤</div>
+      <div class="emotion-wheel">
+        {% for slot in answers.emotion_slots %}
+        <div class="emotion-slot {% if slot.slot_number >= 7 %}emotion-slot--fixed{% endif %}">
+          <div class="slot-number">第{{ slot.slot_number }}格</div>
+          <div class="emotion-display" style="background: var(--primary-light);">
+            {{ slot.color | default('') }} / {{ slot.emotion | default('') }}
+          </div>
+          <div class="answer-value" style="margin-top: 6px;">{{ slot.thought | default('') }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% else %}
+      {% for key, value in answers.items() %}
+      <div class="answer-field">
+        <div class="answer-label">{{ key }}</div>
+        <div class="answer-value">
+          {% if value is iterable and value is not string %}
+            {{ value | tojson }}
+          {% else %}
+            {{ value }}
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>&#x1F31F; 老師的評語</h2>
+  {% if teacher_comment %}
+  <div class="teacher-comment">{{ teacher_comment }}</div>
+  {% else %}
+  <p style="color: var(--text-light);">評語尚未產生，請稍後再查看。</p>
+  {% endif %}
+</div>
+
+<div style="margin-top: 16px;">
+  <a href="/" class="btn btn-secondary">&#x1F3E0; 回到首頁</a>
+</div>
+{% endif %}
+{% endblock %}

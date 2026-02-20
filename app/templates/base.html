@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}EQ改作業小幫手{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="container">
+      <a href="/" class="nav-brand">&#x1F9E0; EQ改作業小幫手</a>
+      <div class="nav-links">
+        <a href="/">&#x1F4DD; 學生</a>
+        <a href="/teacher">&#x1F468;&#x200D;&#x1F3EB; 老師</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>
+    <div class="container">本系統由 AI 輔助評分，最終評語以老師審閱為準</div>
+  </footer>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text">AI老師正在認真看你的答案喔<br>請稍等一下 &#x1F914;</div>
+  </div>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

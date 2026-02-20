@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}審閱 - {{ submission.student_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>{{ submission.student_name }} 的 {{ questionnaire_name }}</h1>
+  <p>提交時間：{{ submission.created_at.strftime('%Y/%m/%d %H:%M') }}
+    {% if evaluation and evaluation.reviewed_by_teacher %}
+      <span class="badge badge-success">已審閱</span>
+    {% else %}
+      <span class="badge badge-muted">未審閱</span>
+    {% endif %}
+  </p>
+</div>
+
+<div class="section">
+  <div class="section-title">&#x1F4DD; 學生答案</div>
+  <div class="card">
+    {% if submission.questionnaire_id == "emotion_abc" %}
+      <div class="answer-field">
+        <div class="answer-label">事件</div>
+        <div class="answer-value">{{ answers.event | default('') }}</div>
+      </div>
+      <div class="answer-field">
+        <div class="answer-label">情緒</div>
+        <div class="answer-value">{{ answers.emotion | default('') }}</div>
+      </div>
+      <div class="answer-field">
+        <div class="answer-label">想法</div>
+        <div class="answer-value">{{ answers.thought | default('') }}</div>
+      </div>
+    {% elif submission.questionnaire_id == "eq_thought_handle" %}
+      <div class="answer-field">
+        <div class="answer-label">事件</div>
+        <div class="answer-value">{{ answers.event | default('') }}</div>
+      </div>
+      {% if answers.emotion_slots is defined %}
+      <div class="answer-label" style="margin-top: 14px;">情緒轉盤</div>
+      <div class="emotion-wheel">
+        {% for slot in answers.emotion_slots %}
+        <div class="emotion-slot {% if slot.slot_number >= 7 %}emotion-slot--fixed{% endif %}">
+          <div class="slot-number">第{{ slot.slot_number }}格</div>
+          <div class="emotion-display" style="background: var(--primary-light);">
+            {{ slot.color | default('') }} / {{ slot.emotion | default('') }}
+          </div>
+          <div class="answer-value" style="margin-top: 6px;">{{ slot.thought | default('') }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% else %}
+      {% for key, value in answers.items() %}
+      <div class="answer-field">
+        <div class="answer-label">{{ key }}</div>
+        <div class="answer-value">{{ value }}</div>
+      </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+</div>
+
+{% if self_reflection or scores %}
+<div class="section">
+  <div class="section-title">&#x1F50D; AI 分析（僅老師可見）</div>
+
+  {% if self_reflection %}
+  <div class="card">
+    <h3>學生自我反思（AI 模擬）</h3>
+    <div class="detail-grid">
+      <div class="detail-item">
+        <div class="detail-label">信心程度</div>
+        <div class="detail-value">{{ self_reflection.confidence | default('-') }}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">覺得最難的部分</div>
+        <div class="detail-value">{{ self_reflection.perceived_difficulty | default('-') }}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">自我評價</div>
+        <div class="detail-value">{{ self_reflection.self_assessment | default('-') }}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">不確定的欄位</div>
+        <div class="detail-value">
+          {% if self_reflection.uncertain_parts %}
+            {{ self_reflection.uncertain_parts | join(', ') }}
+          {% else %}
+            -
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if scores %}
+  <div class="card">
+    <h3>評分結果</h3>
+    <div style="margin-bottom: 12px;">
+      整體品質：
+      {% set quality = scores.overall_quality | default('') %}
+      {% if quality == "優秀" %}
+        <span class="badge badge-success">{{ quality }}</span>
+      {% elif quality == "良好" %}
+        <span class="badge badge-info">{{ quality }}</span>
+      {% elif quality == "普通" %}
+        <span class="badge badge-muted">{{ quality }}</span>
+      {% else %}
+        <span class="badge badge-warning">{{ quality }}</span>
+      {% endif %}
+    </div>
+
+    {% if scores.scores is defined %}
+    {% set dim_names = {"completeness": "完整性", "correctness": "正確性", "depth": "深度", "expression": "表達", "appropriateness": "適切性"} %}
+    {% for key, label in dim_names.items() %}
+      {% set val = scores.scores[key] | default(0) %}
+      <div class="score-row">
+        <div class="score-label">{{ label }}</div>
+        <div class="score-bar-bg">
+          <div class="score-bar" style="width: {{ val * 20 }}%;"></div>
+        </div>
+        <div class="score-value">{{ val }}/5</div>
+      </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if scores.strengths is defined and scores.strengths %}
+    <div style="margin-top: 16px;">
+      <strong>&#x2705; 優點</strong>
+      <div class="badge-list">
+        {% for s in scores.strengths %}
+        <span class="badge badge-success">{{ s }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if scores.weaknesses is defined and scores.weaknesses %}
+    <div style="margin-top: 10px;">
+      <strong>&#x26A0;&#xFE0F; 需改進</strong>
+      <div class="badge-list">
+        {% for w in scores.weaknesses %}
+        <span class="badge badge-warning">{{ w }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if scores.error_analysis is defined and scores.error_analysis %}
+    <div style="margin-top: 10px;">
+      <strong>錯誤分析：</strong>{{ scores.error_analysis }}
+    </div>
+    {% endif %}
+
+    {% if scores.suggestions is defined and scores.suggestions %}
+    <div style="margin-top: 10px;">
+      <strong>改進建議：</strong>{{ scores.suggestions }}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="section">
+  <div class="section-title">&#x1F4AC; AI 評語</div>
+  <div class="card">
+    {% if evaluation %}
+    <div class="teacher-comment">{{ evaluation.teacher_comment }}</div>
+
+    {% if evaluation.teacher_override %}
+    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+      <strong>&#x270F;&#xFE0F; 老師修改後的評語：</strong>
+      <div class="teacher-comment" style="margin-top: 8px;">{{ evaluation.teacher_override }}</div>
+    </div>
+    {% endif %}
+
+    <form action="/teacher/{{ submission.id }}/override" method="POST" style="margin-top: 20px;">
+      <div class="form-group">
+        <label class="form-label">修改評語（選填）</label>
+        <textarea name="teacher_comment" class="form-textarea"
+                  placeholder="如果想修改 AI 的評語，可以在這裡寫你的版本...">{{ evaluation.teacher_override | default('') }}</textarea>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button type="submit" class="btn btn-primary">&#x1F4BE; 儲存修改</button>
+        <a href="/teacher" class="btn btn-secondary">&#x2190; 返回列表</a>
+      </div>
+    </form>
+    {% else %}
+    <p style="color: var(--text-light);">尚無評估資料</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

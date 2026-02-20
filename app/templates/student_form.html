@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}EQ練習{% endblock %}
+
+{% block content %}
+{% if error is defined and error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+{% if questionnaire is none or questionnaire is not defined or not questionnaire %}
+<div class="page-header">
+  <h1>&#x1F44B; 歡迎來到EQ練功房！</h1>
+  <p>請選擇一個練習開始吧</p>
+</div>
+<div class="card-grid">
+  {% for q_id, q in questionnaires.items() %}
+  <a href="/questionnaire/{{ q_id }}" class="card-link">
+    <h3>{{ q.name }}</h3>
+    <p>{{ q.description }}</p>
+  </a>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="page-header">
+  <h1>{{ questionnaire.name }}</h1>
+  <p>{{ questionnaire.description }}</p>
+</div>
+
+{% if questionnaire.instructions is defined and questionnaire.instructions %}
+<div class="card" style="background: var(--primary-light); border-color: var(--primary);">
+  <h3>&#x1F4CB; 說明</h3>
+  <div style="white-space: pre-line;">{{ questionnaire.instructions }}</div>
+</div>
+{% endif %}
+
+<form action="/submit" method="POST" id="gradeForm">
+  <input type="hidden" name="questionnaire_id" value="{{ questionnaire.id }}">
+
+  <div class="card">
+    <div class="form-group">
+      <label class="form-label">&#x1F464; 你的名字</label>
+      <input type="text" name="student_name" class="form-input" placeholder="請輸入你的名字" required>
+    </div>
+
+    {% for field in questionnaire.schema.fields %}
+      {% if field.type == "text" %}
+    <div class="form-group">
+      <label class="form-label">{{ field.label }}</label>
+      <textarea name="{{ field.name }}" class="form-textarea"
+                placeholder="{{ field.placeholder | default('') }}"
+                {% if field.required | default(false) %}required{% endif %}
+                {% if field.min_length is defined %}minlength="{{ field.min_length }}"{% endif %}></textarea>
+    </div>
+      {% elif field.type == "emotion_wheel" %}
+    <div class="form-group">
+      <label class="form-label">&#x1F3A8; 情緒轉盤（共8格）</label>
+      <div class="emotion-wheel">
+        {% for i in range(1, 9) %}
+        <div class="emotion-slot {% if i >= 7 %}emotion-slot--fixed{% endif %}">
+          <div class="slot-number">第{{ i }}格</div>
+          {% if i < 7 %}
+          <input type="text" name="slot_{{ i }}_color" class="form-input" placeholder="顏色（如：紅色）" required>
+          <input type="text" name="slot_{{ i }}_emotion" class="form-input" placeholder="情緒（如：生氣）" required>
+          {% else %}
+            {% if fixed_slots is defined and fixed_slots %}
+              {% set fs = fixed_slots[i] if i in fixed_slots else fixed_slots[i|string] if i|string in fixed_slots else none %}
+              {% if fs %}
+          <div class="fixed-label">{{ fs.color }} / {{ fs.emotion }}</div>
+              {% endif %}
+            {% else %}
+              {% if i == 7 %}
+          <div class="fixed-label">綠色 / 平靜</div>
+              {% elif i == 8 %}
+          <div class="fixed-label">黃色 / 希望</div>
+              {% endif %}
+            {% endif %}
+          {% endif %}
+          <textarea name="slot_{{ i }}_thought" class="form-textarea short"
+                    placeholder="{% if i == 7 %}能幫助自己回到平靜的想法...{% elif i == 8 %}能產生希望感受的想法...{% else %}這個情緒背後的想法是...{% endif %}"
+                    required></textarea>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <button type="submit" class="btn btn-primary">送出我的答案 &#x270F;&#xFE0F;</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('gradeForm')?.addEventListener('submit', function() {
+  document.getElementById('loadingOverlay').classList.add('active');
+});
+</script>
+{% endblock %}
