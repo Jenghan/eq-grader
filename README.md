@@ -2,14 +2,17 @@
 
 在 Mac Mini 上完全本地運行的 AI 改作業系統，專為國小 EQ（情緒教育）練習設計。
 
-學生填寫練習 → AI 自動生成老師評語 → 老師可審閱修改。所有資料與模型都在你的 Mac 上，不經過任何雲端。
+學生填寫練習 → AI 自動生成老師評語 → 老師可審閱修改。預設所有資料與模型都在你的 Mac 上，不經過任何雲端。
 
 ## 功能
 
 - **學生端**：選擇問卷 → 填寫答案 → 收到老師評語
-- **老師端**：瀏覽所有作答 → 查看 AI 評分細節（5 維度分數、優缺點分析）→ 修改評語
+- **老師端**：瀏覽所有作答 → 查看 AI 評語 → 展開 AI 分析細節（5 維度分數、優缺點）→ 修改評語
 - **AI 三階段評分**：理解 → 結構化評估 → 自然語言評語
 - **可擴充問卷**：新增 YAML 檔即可，不用改程式碼
+- **Google 帳號登入**：老師端可啟用 Google OAuth 保護（選配）
+- **Gemini API 評語**：Stage 3 評語可選用 Google Gemini，口語更自然（選配）
+- **PostgreSQL 支援**：可切換到 LAN PostgreSQL 資料庫（選配）
 
 ### 支援的問卷
 
@@ -107,7 +110,7 @@ ollama list
 > ```bash
 > ollama pull qwen2.5:7b
 > ```
-> 然後在 Step 7 啟動前，修改 `app/config.py` 裡的 `ollama_model` 為 `"qwen2.5:7b"`。
+> 然後在 `.env` 中將 `OLLAMA_MODEL` 改為 `qwen2.5:7b`。
 
 ### Step 6：安裝專案
 
@@ -132,7 +135,35 @@ cd ~/Desktop/ActiveKM/eq-grader
 bash setup.sh
 ```
 
-### Step 7：啟動應用
+### Step 7：設定環境變數
+
+複製範例設定檔：
+
+```bash
+cp .env.example .env
+```
+
+預設值即可直接使用。如需自訂，用文字編輯器打開 `.env`：
+
+```bash
+open -e .env
+```
+
+可調整的設定：
+
+| 設定 | 預設值 | 說明 |
+|---|---|---|
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama 服務位址 |
+| `OLLAMA_MODEL` | `qwen2.5:14b` | 使用的 LLM 模型 |
+| `DATABASE_URL` | `sqlite:///./eq_grader.db` | 資料庫連線（支援 PostgreSQL） |
+| `GEMINI_API_KEY` | （空，停用） | 填入後 Stage 3 評語改走 Gemini |
+| `GEMINI_MODEL` | `gemini-2.0-flash` | Gemini 模型 |
+| `GOOGLE_CLIENT_ID` | （空，停用） | Google OAuth Client ID |
+| `GOOGLE_CLIENT_SECRET` | （空，停用） | Google OAuth Client Secret |
+| `APP_BASE_URL` | `http://localhost:8000` | 部署用的 Base URL |
+| `SESSION_SECRET` | `change-me-to-a-random-string` | Session 加密密鑰（正式環境請更換） |
+
+### Step 8：啟動應用
 
 ```bash
 # 確保在虛擬環境中（前面有 (venv) 字樣）
@@ -149,7 +180,7 @@ INFO:     Uvicorn running on http://0.0.0.0:8000
 INFO:     Started reloader process
 ```
 
-### Step 8：開始使用
+### Step 9：開始使用
 
 打開瀏覽器：
 
@@ -186,38 +217,73 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 學生答案
   ↓
-Stage 1: 理解 ─── LLM 解析答案，產出結構化理解
+Stage 1: 理解 ─── LLM 解析答案，產出結構化理解          [Ollama]
   ↓
-Stage 2: 評估 ─── 根據評分規準打分（完整性/正確性/深度/表達/適切性，各 1-5 分）
+Stage 2: 評估 ─── 根據評分規準打分（5 維度，各 1-5 分）  [Ollama]
   ↓
-Stage 3: 評語 ─── 生成溫暖鼓勵的老師評語（80-150 字）
+Stage 3: 評語 ─── 生成溫暖鼓勵的老師評語（80-150 字）   [Ollama 或 Gemini]
   ↓
 老師審閱（可修改）→ 學生看到最終評語
 ```
 
-學生只會看到自己的答案和老師評語。AI 的結構化評分與分析僅供老師參考。
+學生只會看到自己的答案和老師評語。AI 的結構化評分與分析僅供老師參考（預設收合，點擊展開）。
+
+### Gemini 評語（選配）
+
+如果覺得 Ollama 本地模型的評語不夠自然，可以讓 Stage 3 改走 Google Gemini：
+
+1. 取得 [Gemini API Key](https://aistudio.google.com/apikey)
+2. 在 `.env` 填入：
+   ```
+   GEMINI_API_KEY=your-api-key-here
+   ```
+3. 重啟服務即生效。Stage 1+2 仍走本地 Ollama（JSON 結構化輸出穩定），Stage 3 走 Gemini（口語更自然）
 
 ---
 
-## 設定
+## Google 登入（選配）
 
-### 環境變數
+啟用後，老師端（`/teacher`）需要使用 Google 帳號登入才能進入。學生端不受影響。
 
-在 `app/config.py` 中修改：
+每次登入都會記錄到 `login_record` 資料表（email、IP、時間）。
 
-| 設定 | 預設值 | 說明 |
-|---|---|---|
-| `ollama_base_url` | `http://localhost:11434` | Ollama 服務位址 |
-| `ollama_model` | `qwen2.5:14b` | 使用的 LLM 模型 |
-| `database_url` | `sqlite:///./eq_grader.db` | 資料庫位置 |
+### 快速設定
 
-### 模型替換
+1. 到 Google Cloud Console 建立 OAuth 憑證
+2. 在 `.env` 填入 Client ID 和 Secret：
+   ```
+   GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=xxxxx
+   ```
+3. 重啟服務，Nav 會出現「Google 登入」按鈕
+
+> 完整圖文步驟請參考 [`docs/google-oauth-setup.md`](docs/google-oauth-setup.md)
+
+---
+
+## PostgreSQL 資料庫（選配）
+
+預設使用 SQLite（零設定）。如需切換到 LAN 上的 PostgreSQL：
+
+在 `.env` 中修改：
+
+```
+DATABASE_URL=postgresql://user:password@192.168.x.x:5432/eq_grader
+```
+
+重啟服務即可。所有資料模型完全相容，不需改任何程式碼。
+
+---
+
+## 模型替換
 
 | 情境 | 建議模型 | RAM 需求 | 安裝指令 |
 |---|---|---|---|
 | 32GB Mac（預設） | `qwen2.5:14b` | ~10GB | `ollama pull qwen2.5:14b` |
 | 16GB Mac | `qwen2.5:7b` | ~5GB | `ollama pull qwen2.5:7b` |
 | 台灣在地化口吻 | `taide:8b` | ~5GB | `ollama pull taide:8b` |
+
+切換模型：修改 `.env` 中的 `OLLAMA_MODEL`，重啟服務。
 
 ---
 
@@ -263,22 +329,28 @@ feedback_style:
 ```
 eq-grader/
 ├── app/
-│   ├── main.py              # FastAPI 入口
-│   ├── config.py            # 設定 + 載入問卷
-│   ├── database.py          # SQLite 資料庫
-│   ├── models.py            # 資料模型
+│   ├── main.py              # FastAPI 入口 + middleware
+│   ├── config.py            # 環境變數設定（讀 .env）
+│   ├── database.py          # 資料庫引擎（SQLite / PostgreSQL）
+│   ├── models.py            # 資料模型（含 User、LoginRecord）
 │   ├── llm/
 │   │   ├── client.py        # Ollama HTTP client
+│   │   ├── gemini_client.py # Gemini API client
 │   │   ├── prompts.py       # 三階段 prompt 模板
-│   │   └── pipeline.py      # 評分管線
+│   │   └── pipeline.py      # 評分管線（自動選引擎）
 │   ├── routers/
 │   │   ├── student.py       # 學生路由
-│   │   └── teacher.py       # 老師路由
+│   │   ├── teacher.py       # 老師路由（含登入保護）
+│   │   └── auth.py          # Google OAuth 登入/登出
 │   ├── templates/           # Jinja2 HTML 模板
 │   └── static/              # CSS
 ├── questionnaires/          # 問卷定義（YAML）
 │   ├── emotion_abc.yaml     # 情緒ABC練習
 │   └── eq_thought_handle.yaml  # 想法心手把
+├── docs/
+│   └── google-oauth-setup.md  # Google OAuth 設定指南
+├── .env.example             # 環境變數範本
+├── .gitignore
 ├── requirements.txt
 ├── setup.sh                 # 一鍵安裝腳本
 └── README.md
@@ -286,9 +358,10 @@ eq-grader/
 
 ## 技術棧
 
-- **Backend**: Python FastAPI + SQLModel + SQLite
+- **Backend**: Python FastAPI + SQLModel + SQLite（可切 PostgreSQL）
 - **Frontend**: Jinja2 模板 + 原生 CSS
-- **LLM**: Ollama（本地推論）
+- **LLM**: Ollama（本地推論）/ Gemini API（選配）
+- **認證**: Google OAuth2 + Starlette Session（選配）
 - **預設模型**: Qwen2.5-14B（Q4 量化）
 
 ---
@@ -306,3 +379,12 @@ A: 刪除 `eq_grader.db` 檔案，重啟服務會自動建立空的資料庫。
 
 **Q: 區域網路內其他電腦可以連嗎？**
 A: 可以。啟動時已設定 `--host 0.0.0.0`，其他電腦用 `http://你的Mac的IP:8000` 即可連入。用 `ifconfig | grep inet` 查看 IP。
+
+**Q: Google 登入按鈕沒有出現**
+A: 確認 `.env` 中 `GOOGLE_CLIENT_ID` 和 `GOOGLE_CLIENT_SECRET` 都有填入，且前面沒有 `#` 註解符號。修改後須重啟服務。
+
+**Q: 登入時出現 "redirect_uri_mismatch"**
+A: Google Cloud Console 中設定的「已授權的重新導向 URI」與實際存取的網址不符。確認有加入 `http://localhost:8000/auth/callback`（以及 LAN IP 版本）。
+
+**Q: 如何切換到 PostgreSQL？**
+A: 在 `.env` 中將 `DATABASE_URL` 改為 `postgresql://user:pass@host:5432/dbname`，重啟服務即可。首次連線會自動建立所有資料表。
