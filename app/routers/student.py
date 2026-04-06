@@ -108,7 +108,10 @@ async def show_result(request: Request, submission_id: str, session: Session = D
     q_name = app_state["questionnaires"].get(submission.questionnaire_id, {}).get("name", submission.questionnaire_id)
     comment = ""
     if evaluation:
-        comment = evaluation.teacher_override or evaluation.teacher_comment
+        if evaluation.reviewed_by_teacher:
+            comment = evaluation.teacher_override or evaluation.teacher_comment
+        else:
+            comment = evaluation.teacher_comment
 
     return templates.TemplateResponse("student_result.html", {
         "request": request,
@@ -172,5 +175,63 @@ async def _grade_submission(submission_id: str, questionnaire_id: str, answers: 
             )
             session.add(evaluation)
 
+        session.add(submission)
+        session.commit()
+
+
+def _build_override_after_regrade(old_override: str, old_teacher_comment: str) -> str | None:
+    """Append pre-regrade AI comment to the end of 修改評語 (teacher_override)."""
+    base = (old_override or "").rstrip()
+    archive = (old_teacher_comment or "").strip()
+    if not archive:
+        return base or None
+    marker = "\n\n---【重新批改前留存】---\n"
+    if base:
+        return f"{base}{marker}{archive}"
+    return f"---【重新批改前留存】---\n{archive}"
+
+
+async def _regrade_submission(submission_id: str) -> None:
+    """Re-run grading; replace AI fields; append old teacher_comment to teacher_override."""
+    from app.main import app_state
+
+    pipeline = app_state["pipeline"]
+    with Session(engine) as session:
+        submission = session.get(StudentSubmission, submission_id)
+        if not submission:
+            return
+        evaluation = session.exec(
+            select(AIEvaluation).where(AIEvaluation.submission_id == submission_id)
+        ).first()
+        if not evaluation:
+            submission.status = "error"
+            session.add(submission)
+            session.commit()
+            return
+
+        old_comment = evaluation.teacher_comment or ""
+        old_override = evaluation.teacher_override or ""
+        answers = json.loads(submission.raw_answer)
+        q_id = submission.questionnaire_id
+
+        try:
+            result = await pipeline.grade(q_id, answers)
+        except Exception:
+            submission.status = "error"
+            session.add(submission)
+            session.commit()
+            return
+
+        new_override = _build_override_after_regrade(old_override, old_comment)
+        evaluation.student_self_reflection = json.dumps(
+            result.student_self_reflection, ensure_ascii=False
+        )
+        evaluation.teacher_scores = json.dumps(result.teacher_scores, ensure_ascii=False)
+        evaluation.teacher_comment = result.teacher_comment
+        evaluation.raw_llm_output = json.dumps(result.raw_output, ensure_ascii=False)
+        evaluation.teacher_override = new_override
+        evaluation.reviewed_by_teacher = False
+        submission.status = "completed"
+        session.add(evaluation)
         session.add(submission)
         session.commit()
