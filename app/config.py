@@ -24,6 +24,7 @@ class Settings:
     google_client_secret: str = field(default_factory=lambda: os.getenv("GOOGLE_CLIENT_SECRET", ""))
     app_base_url: str = field(default_factory=lambda: os.getenv("APP_BASE_URL", "http://localhost:8000"))
     session_secret: str = field(default_factory=lambda: os.getenv("SESSION_SECRET", "change-me-to-a-random-string"))
+    super_user_email: str = field(default_factory=lambda: os.getenv("SUPER_USER_EMAIL", "jenghan.hsieh@gmail.com").strip().lower())
 
     # Questionnaires
     questionnaires_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent / "questionnaires")

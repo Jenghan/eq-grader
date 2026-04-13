@@ -5,6 +5,9 @@
 {% if error is defined and error %}
 <div class="alert alert-error">{{ error }}</div>
 {% endif %}
+{% if request.query_params.get('error') == 'teacher_required' %}
+<div class="alert alert-error">你的帳號目前是學生身分，尚未開通老師功能。請聯繫 super user 協助審核。</div>
+{% endif %}
 
 {% if questionnaire is none or questionnaire is not defined or not questionnaire %}
 <div class="page-header">

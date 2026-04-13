@@ -54,18 +54,25 @@ async def auth_callback(request: Request, session: Session = Depends(get_session
         select(User).where(User.google_id == google_id)
     ).first()
 
+    normalized_super_email = settings.super_user_email
+    is_super_user = email.lower() == normalized_super_email
+
     if not user:
         user = User(
             google_id=google_id,
             email=email,
             name=name,
             avatar_url=avatar,
+            role="super_user" if is_super_user else "student",
         )
         session.add(user)
     else:
+        user.email = email
         user.name = name
         user.avatar_url = avatar
         user.last_login = datetime.now()
+        if is_super_user and user.role != "super_user":
+            user.role = "super_user"
         session.add(user)
 
     session.commit()
@@ -86,8 +93,11 @@ async def auth_callback(request: Request, session: Session = Depends(get_session
     request.session["user_name"] = user.name
     request.session["user_email"] = user.email
     request.session["user_avatar"] = user.avatar_url
+    request.session["user_role"] = user.role
 
-    return RedirectResponse(url="/teacher")
+    if user.role in {"teacher", "super_user"}:
+        return RedirectResponse(url="/teacher")
+    return RedirectResponse(url="/")
 
 
 @router.get("/logout")
@@ -106,7 +116,35 @@ def get_current_user(request: Request) -> dict | None:
         "name": request.session.get("user_name", ""),
         "email": request.session.get("user_email", ""),
         "avatar": request.session.get("user_avatar", ""),
+        "role": request.session.get("user_role", "student"),
     }
+
+
+def require_teacher(request: Request, session: Session) -> dict:
+    """Require teacher/super_user role to access teacher features."""
+    user = get_current_user(request)
+    if not user:
+        raise _LoginRequired()
+
+    db_user = session.get(User, user["id"])
+    if not db_user:
+        request.session.clear()
+        raise _LoginRequired()
+
+    request.session["user_role"] = db_user.role
+    if db_user.role not in {"teacher", "super_user"}:
+        raise _RoleRequired("/?error=teacher_required")
+
+    user["role"] = db_user.role
+    return user
+
+
+def require_super_user(request: Request, session: Session) -> dict:
+    """Require super_user role for account management features."""
+    user = require_teacher(request, session)
+    if user["role"] != "super_user":
+        raise _RoleRequired("/teacher?error=super_user_required")
+    return user
 
 
 def require_login(request: Request) -> dict:
@@ -120,3 +158,10 @@ def require_login(request: Request) -> dict:
 class _LoginRequired(Exception):
     """Raised when login is required but user is not authenticated."""
     pass
+
+
+class _RoleRequired(Exception):
+    """Raised when role permission is required."""
+
+    def __init__(self, redirect_url: str):
+        self.redirect_url = redirect_url

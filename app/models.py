@@ -41,7 +41,7 @@ class User(SQLModel, table=True):
     email: str = ""
     name: str = ""
     avatar_url: str = ""
-    role: str = "teacher"  # teacher / admin
+    role: str = "student"  # student / teacher / super_user
     created_at: Optional[datetime] = Field(default_factory=datetime.now)
     last_login: Optional[datetime] = None
 

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}使用者清單{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>&#x1F465; 使用者清單</h1>
+  <p>僅 super user 可查看與審核帳號身分</p>
+</div>
+
+<div class="card">
+  <p style="margin-bottom: 14px; color: var(--text-light);">
+    super user 預設帳號：<strong>{{ super_user_email }}</strong>
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>姓名</th>
+          <th>Email</th>
+          <th>角色</th>
+          <th>建立時間</th>
+          <th>最後登入</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in users %}
+        <tr>
+          <td><strong>{{ item.name or "-" }}</strong></td>
+          <td>{{ item.email }}</td>
+          <td>
+            {% if item.role == "super_user" %}
+              <span class="badge badge-danger">super user</span>
+            {% elif item.role == "teacher" %}
+              <span class="badge badge-info">老師</span>
+            {% else %}
+              <span class="badge badge-muted">學生</span>
+            {% endif %}
+          </td>
+          <td>{{ item.created_at.strftime('%Y/%m/%d %H:%M') if item.created_at else "-" }}</td>
+          <td>{{ item.last_login.strftime('%Y/%m/%d %H:%M') if item.last_login else "-" }}</td>
+          <td>
+            {% if item.role == "student" %}
+            <form action="/teacher/users/{{ item.id }}/promote" method="POST" style="display: inline; margin: 0;"
+                  onsubmit="return confirm('確定將此帳號升級為老師身分？');">
+              <button type="submit" class="btn btn-sm btn-primary">升級為老師</button>
+            </form>
+            {% else %}
+              <span style="color: var(--text-light);">-</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

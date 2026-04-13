@@ -13,6 +13,9 @@
       <div class="nav-links">
         <a href="/">&#x1F4DD; 學生</a>
         <a href="/teacher">&#x1F468;&#x200D;&#x1F3EB; 老師</a>
+        {% if request.session and request.session.get('user_role') == 'super_user' %}
+          <a href="/teacher/users">&#x1F465; 使用者清單</a>
+        {% endif %}
         {% if request.session and request.session.get('user_id') %}
           <span class="nav-user">
             {% if request.session.get('user_avatar') %}

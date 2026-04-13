@@ -11,7 +11,7 @@ from app.llm.client import OllamaClient
 from app.llm.gemini_client import GeminiClient
 from app.llm.pipeline import GradingPipeline
 from app.routers import student, teacher
-from app.routers.auth import router as auth_router, _LoginRequired
+from app.routers.auth import router as auth_router, _LoginRequired, _RoleRequired
 
 app_state: dict = {}
 
@@ -52,6 +52,11 @@ app.include_router(teacher.router)
 @app.exception_handler(_LoginRequired)
 async def login_required_handler(request: Request, exc: _LoginRequired):
     return RedirectResponse(url="/login")
+
+
+@app.exception_handler(_RoleRequired)
+async def role_required_handler(request: Request, exc: _RoleRequired):
+    return RedirectResponse(url=exc.redirect_url, status_code=303)
 
 
 @app.get("/health")

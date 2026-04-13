@@ -10,28 +10,32 @@
 - **老師端**：瀏覽所有作答 → 查看 AI 評語 → 展開 AI 分析細節（5 維度分數、優缺點）→ 修改評語
 - **AI 三階段評分**：理解 → 結構化評估 → 自然語言評語
 - **可擴充問卷**：新增 YAML 檔即可，不用改程式碼
-- **Google 帳號登入**：老師端可啟用 Google OAuth 保護（選配）
+- **Google 帳號登入 + 角色審核**：新帳號預設為學生，需由 super user 升級為老師後才能使用老師端
 - **Gemini API 評語**：Stage 3 評語可選用 Google Gemini，口語更自然（選配）
 - **PostgreSQL 支援**：可切換到 LAN PostgreSQL 資料庫（選配）
 
 ### 支援的問卷
 
-| 問卷 | 學生填寫內容 |
-|---|---|
-| 情緒ABC練習 | 事件、情緒、想法 |
+
+| 問卷          | 學生填寫內容              |
+| ----------- | ------------------- |
+| 情緒ABC練習     | 事件、情緒、想法            |
 | EQ練功房：想法心手把 | 事件 + 8格情緒轉盤（含平靜與希望） |
+
 
 ---
 
 ## 系統需求
 
-| 項目 | 最低需求 | 建議 |
-|---|---|---|
-| 電腦 | Apple Silicon Mac（M1 以上） | Mac Mini M2 Pro / M4 |
-| RAM | 16GB（可跑但較慢） | 32GB |
-| macOS | 13 Ventura 以上 | 最新版本 |
-| 磁碟空間 | 15GB（模型 + 程式） | 20GB+ |
-| Python | 3.11+ | 3.12 |
+
+| 項目     | 最低需求                     | 建議                   |
+| ------ | ------------------------ | -------------------- |
+| 電腦     | Apple Silicon Mac（M1 以上） | Mac Mini M2 Pro / M4 |
+| RAM    | 16GB（可跑但較慢）              | 32GB                 |
+| macOS  | 13 Ventura 以上            | 最新版本                 |
+| 磁碟空間   | 15GB（模型 + 程式）            | 20GB+                |
+| Python | 3.11+                    | 3.12                 |
+
 
 ---
 
@@ -70,7 +74,7 @@ brew install ollama
 
 方法二：直接下載
 
-1. 前往 https://ollama.com/download
+1. 前往 [https://ollama.com/download](https://ollama.com/download)
 2. 下載 Mac 版本
 3. 打開 .dmg 檔，將 Ollama 拖進「應用程式」
 4. 首次打開 Ollama 應用程式（它會在選單列出現一個小圖示）
@@ -107,9 +111,11 @@ ollama list
 ```
 
 > **RAM 只有 16GB？** 改用較小的模型：
+>
 > ```bash
 > ollama pull qwen2.5:7b
 > ```
+>
 > 然後在 `.env` 中將 `OLLAMA_MODEL` 改為 `qwen2.5:7b`。
 
 ### Step 6：安裝專案
@@ -151,17 +157,20 @@ open -e .env
 
 可調整的設定：
 
-| 設定 | 預設值 | 說明 |
-|---|---|---|
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama 服務位址 |
-| `OLLAMA_MODEL` | `qwen2.5:14b` | 使用的 LLM 模型 |
-| `DATABASE_URL` | `sqlite:///./eq_grader.db` | 資料庫連線（支援 PostgreSQL） |
-| `GEMINI_API_KEY` | （空，停用） | 填入後 Stage 3 評語改走 Gemini |
-| `GEMINI_MODEL` | `gemini-2.0-flash` | Gemini 模型 |
-| `GOOGLE_CLIENT_ID` | （空，停用） | Google OAuth Client ID |
-| `GOOGLE_CLIENT_SECRET` | （空，停用） | Google OAuth Client Secret |
-| `APP_BASE_URL` | `http://localhost:8000` | 部署用的 Base URL |
-| `SESSION_SECRET` | `change-me-to-a-random-string` | Session 加密密鑰（正式環境請更換） |
+
+| 設定                     | 預設值                            | 說明                         |
+| ---------------------- | ------------------------------ | -------------------------- |
+| `OLLAMA_BASE_URL`      | `http://localhost:11434`       | Ollama 服務位址                |
+| `OLLAMA_MODEL`         | `qwen2.5:14b`                  | 使用的 LLM 模型                 |
+| `DATABASE_URL`         | `sqlite:///./eq_grader.db`     | 資料庫連線（支援 PostgreSQL）       |
+| `GEMINI_API_KEY`       | （空，停用）                         | 填入後 Stage 3 評語改走 Gemini    |
+| `GEMINI_MODEL`         | `gemini-2.0-flash`             | Gemini 模型                  |
+| `GOOGLE_CLIENT_ID`     | （空，停用）                         | Google OAuth Client ID     |
+| `GOOGLE_CLIENT_SECRET` | （空，停用）                         | Google OAuth Client Secret |
+| `SUPER_USER_EMAIL`     | `jenghan.hsieh@gmail.com`            | super user 帳號（可管理使用者角色） |
+| `APP_BASE_URL`         | `http://localhost:8000`        | 部署用的 Base URL              |
+| `SESSION_SECRET`       | `change-me-to-a-random-string` | Session 加密密鑰（正式環境請更換）      |
+
 
 ### Step 8：啟動應用
 
@@ -184,11 +193,13 @@ INFO:     Started reloader process
 
 打開瀏覽器：
 
-| 頁面 | 網址 |
-|---|---|
-| 學生填答 | http://localhost:8000 |
-| 老師審閱 | http://localhost:8000/teacher |
-| 系統狀態 | http://localhost:8000/health |
+
+| 頁面   | 網址                                                             |
+| ---- | -------------------------------------------------------------- |
+| 學生填答 | [http://localhost:8000](http://localhost:8000)                 |
+| 老師審閱 | [http://localhost:8000/teacher](http://localhost:8000/teacher) |
+| 系統狀態 | [http://localhost:8000/health](http://localhost:8000/health)   |
+
 
 ---
 
@@ -234,9 +245,9 @@ Stage 3: 評語 ─── 生成溫暖鼓勵的老師評語（80-150 字）   [O
 
 1. 取得 [Gemini API Key](https://aistudio.google.com/apikey)
 2. 在 `.env` 填入：
-   ```
+  ```
    GEMINI_API_KEY=your-api-key-here
-   ```
+  ```
 3. 重啟服務即生效。Stage 1+2 仍走本地 Ollama（JSON 結構化輸出穩定），Stage 3 走 Gemini（口語更自然）
 
 ---
@@ -245,19 +256,26 @@ Stage 3: 評語 ─── 生成溫暖鼓勵的老師評語（80-150 字）   [O
 
 啟用後，老師端（`/teacher`）需要使用 Google 帳號登入才能進入。學生端不受影響。
 
+帳號角色規則如下：
+
+1. 新使用者第一次 Google 登入後，預設為「學生」角色（只能使用學生功能）
+2. `SUPER_USER_EMAIL`（預設 `jenghan.hsieh@gmail.com`）登入後自動成為 `super user`
+3. `super user` 可在「使用者清單」（`/teacher/users`）將指定帳號升級為「老師」
+4. 只有「老師」與 `super user` 可以使用老師端功能
+
 每次登入都會記錄到 `login_record` 資料表（email、IP、時間）。
 
 ### 快速設定
 
 1. 到 Google Cloud Console 建立 OAuth 憑證
 2. 在 `.env` 填入 Client ID 和 Secret：
-   ```
+  ```
    GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
    GOOGLE_CLIENT_SECRET=xxxxx
-   ```
+  ```
 3. 重啟服務，Nav 會出現「Google 登入」按鈕
 
-> 完整圖文步驟請參考 [`docs/google-oauth-setup.md`](docs/google-oauth-setup.md)
+> 完整圖文步驟請參考 `[docs/google-oauth-setup.md](docs/google-oauth-setup.md)`
 
 ---
 
@@ -277,11 +295,13 @@ DATABASE_URL=postgresql://user:password@192.168.x.x:5432/eq_grader
 
 ## 模型替換
 
-| 情境 | 建議模型 | RAM 需求 | 安裝指令 |
-|---|---|---|---|
-| 32GB Mac（預設） | `qwen2.5:14b` | ~10GB | `ollama pull qwen2.5:14b` |
-| 16GB Mac | `qwen2.5:7b` | ~5GB | `ollama pull qwen2.5:7b` |
-| 台灣在地化口吻 | `taide:8b` | ~5GB | `ollama pull taide:8b` |
+
+| 情境           | 建議模型          | RAM 需求 | 安裝指令                      |
+| ------------ | ------------- | ------ | ------------------------- |
+| 32GB Mac（預設） | `qwen2.5:14b` | ~10GB  | `ollama pull qwen2.5:14b` |
+| 16GB Mac     | `qwen2.5:7b`  | ~5GB   | `ollama pull qwen2.5:7b`  |
+| 台灣在地化口吻      | `taide:8b`    | ~5GB   | `ollama pull taide:8b`    |
+
 
 切換模型：修改 `.env` 中的 `OLLAMA_MODEL`，重啟服務。
 

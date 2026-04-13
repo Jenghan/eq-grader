@@ -5,7 +5,15 @@
 <div class="page-header">
   <h1>&#x1F4DA; 老師批改台</h1>
   <p>所有學生的作答紀錄</p>
+  {% if is_super_user %}
+  <div style="margin-top: 10px;">
+    <a href="/teacher/users" class="btn btn-sm btn-secondary">&#x1F465; 管理使用者</a>
+  </div>
+  {% endif %}
 </div>
+{% if request.query_params.get('error') == 'super_user_required' %}
+<div class="alert alert-error">你目前不是 super user，無法使用帳號審核功能。</div>
+{% endif %}
 
 {% if not submissions %}
 <div class="card empty-state">
