@@ -14,6 +14,21 @@ router = APIRouter(prefix="/teacher")
 templates = Jinja2Templates(directory="app/templates")
 
 
+def _can_view_submission(user: dict, submission: StudentSubmission) -> bool:
+    if user.get("role") == "super_user":
+        return True
+    if user.get("role") == "teacher":
+        return submission.assigned_teacher_id == user.get("id")
+    return False
+
+
+def _list_assignable_teachers(session: Session) -> list[User]:
+    users = session.exec(select(User)).all()
+    cand = [u for u in users if u.role in {"teacher", "super_user"}]
+    cand.sort(key=lambda u: ((u.name or u.email or "").lower(), (u.email or "").lower()))
+    return cand
+
+
 @router.get("")
 async def dashboard(
     request: Request,
@@ -22,12 +37,17 @@ async def dashboard(
     if settings.google_oauth_enabled:
         user = require_teacher(request, session)
     else:
-        user = {"role": "super_user"}
+        user = {"role": "super_user", "id": None}
 
     from app.main import app_state
-    submissions = session.exec(
+    all_rows = session.exec(
         select(StudentSubmission).order_by(StudentSubmission.created_at.desc())
     ).all()
+
+    if user.get("role") == "super_user":
+        submissions = all_rows
+    else:
+        submissions = [s for s in all_rows if s.assigned_teacher_id == user.get("id")]
 
     enriched = []
     for sub in submissions:
@@ -42,12 +62,18 @@ async def dashboard(
                 overall = scores.get("overall_quality", "")
             except (json.JSONDecodeError, AttributeError):
                 pass
+        assignee = None
+        if sub.assigned_teacher_id:
+            assignee = session.get(User, sub.assigned_teacher_id)
         enriched.append({
             "submission": sub,
             "questionnaire_name": q_name,
             "overall_quality": overall,
             "reviewed": ev.reviewed_by_teacher if ev else False,
+            "assignee": assignee,
         })
+
+    reviewer_options = _list_assignable_teachers(session) if user.get("role") == "super_user" else []
 
     return templates.TemplateResponse("teacher_dashboard.html", {
         "request": request,
@@ -55,6 +81,7 @@ async def dashboard(
         "user": user,
         "is_super_user": user.get("role") == "super_user",
         "oauth_enabled": settings.google_oauth_enabled,
+        "reviewer_options": reviewer_options,
     })
 
 
@@ -96,6 +123,35 @@ async def promote_user_to_teacher(
     return RedirectResponse(url="/teacher/users", status_code=303)
 
 
+@router.post("/submissions/batch-assign")
+async def batch_assign_submissions(
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    if not settings.google_oauth_enabled:
+        return RedirectResponse(url="/teacher", status_code=303)
+
+    require_super_user(request, session)
+    form = await request.form()
+    submission_ids = form.getlist("submission_ids")
+    teacher_id = (form.get("assign_teacher_id") or "").strip()
+
+    if not submission_ids or not teacher_id:
+        return RedirectResponse(url="/teacher?error=batch_assign_incomplete", status_code=303)
+
+    assignee = session.get(User, teacher_id)
+    if not assignee or assignee.role not in {"teacher", "super_user"}:
+        return RedirectResponse(url="/teacher?error=batch_assign_invalid_teacher", status_code=303)
+
+    for sid in submission_ids:
+        sub = session.get(StudentSubmission, sid)
+        if sub:
+            sub.assigned_teacher_id = teacher_id
+            session.add(sub)
+    session.commit()
+    return RedirectResponse(url="/teacher?batch_assigned=1", status_code=303)
+
+
 @router.get("/{submission_id}")
 async def review(
     request: Request,
@@ -111,6 +167,13 @@ async def review(
     submission = session.get(StudentSubmission, submission_id)
     if not submission:
         return RedirectResponse(url="/teacher")
+
+    if not _can_view_submission(user, submission):
+        return RedirectResponse(url="/teacher?error=not_assignee", status_code=303)
+
+    assignee = None
+    if submission.assigned_teacher_id:
+        assignee = session.get(User, submission.assigned_teacher_id)
 
     evaluation = session.exec(
         select(AIEvaluation).where(AIEvaluation.submission_id == submission_id)
@@ -142,6 +205,7 @@ async def review(
         "user": user,
         "is_super_user": user.get("role") == "super_user",
         "oauth_enabled": settings.google_oauth_enabled,
+        "assignee": assignee,
     })
 
 
@@ -153,7 +217,13 @@ async def override_comment(
     session: Session = Depends(get_session),
 ):
     if settings.google_oauth_enabled:
-        require_teacher(request, session)
+        user = require_teacher(request, session)
+    else:
+        user = {"role": "super_user", "id": None}
+
+    submission = session.get(StudentSubmission, submission_id)
+    if not submission or not _can_view_submission(user, submission):
+        return RedirectResponse(url="/teacher?error=not_assignee", status_code=303)
 
     evaluation = session.exec(
         select(AIEvaluation).where(AIEvaluation.submission_id == submission_id)
@@ -176,11 +246,15 @@ async def regrade_submission(
     session: Session = Depends(get_session),
 ):
     if settings.google_oauth_enabled:
-        require_teacher(request, session)
+        user = require_teacher(request, session)
+    else:
+        user = {"role": "super_user", "id": None}
 
     submission = session.get(StudentSubmission, submission_id)
     if not submission:
         return RedirectResponse(url="/teacher", status_code=303)
+    if not _can_view_submission(user, submission):
+        return RedirectResponse(url="/teacher?error=not_assignee", status_code=303)
     if submission.status == "grading":
         return RedirectResponse(url=f"/teacher/{submission_id}", status_code=303)
 

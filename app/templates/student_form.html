@@ -8,6 +8,9 @@
 {% if request.query_params.get('error') == 'teacher_required' %}
 <div class="alert alert-error">你的帳號目前是學生身分，尚未開通老師功能。請聯繫 super user 協助審核。</div>
 {% endif %}
+{% if reviewer_filling is defined and reviewer_filling %}
+<div class="alert alert-success">你目前以<strong>老師／管理員</strong>身分填寫：送出後此份問卷將<strong>自動歸您負責檢閱</strong>。</div>
+{% endif %}
 
 {% if questionnaire is none or questionnaire is not defined or not questionnaire %}
 <div class="page-header">

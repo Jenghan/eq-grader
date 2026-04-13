@@ -16,6 +16,8 @@ class StudentSubmission(SQLModel, table=True):
     student_name: str = ""
     raw_answer: str = ""
     status: str = "pending"
+    # 負責檢閱的老師；None 表示尚未分配（僅 super user 可見於老師端）
+    assigned_teacher_id: str | None = Field(default=None, foreign_key="user.id")
     created_at: datetime | None = Field(default_factory=datetime.now)
 
 

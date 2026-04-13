@@ -4,21 +4,61 @@
 {% block content %}
 <div class="page-header">
   <h1>&#x1F4DA; 老師批改台</h1>
-  <p>所有學生的作答紀錄</p>
   {% if is_super_user %}
+  <p>所有學生的作答紀錄（含尚未分配負責老師的問卷）</p>
   <div style="margin-top: 10px;">
     <a href="/teacher/users" class="btn btn-sm btn-secondary">&#x1F465; 管理使用者</a>
   </div>
+  {% else %}
+  <p>目前<strong>指派給您</strong>檢閱的學生作答</p>
   {% endif %}
 </div>
 {% if request.query_params.get('error') == 'super_user_required' %}
 <div class="alert alert-error">你目前不是 super user，無法使用帳號審核功能。</div>
 {% endif %}
+{% if request.query_params.get('error') == 'not_assignee' %}
+<div class="alert alert-error">這份問卷不屬於您負責檢閱，或尚未分配負責老師。</div>
+{% endif %}
+{% if request.query_params.get('error') == 'batch_assign_incomplete' %}
+<div class="alert alert-error">請至少勾選一筆問卷，並選擇要指定的負責老師。</div>
+{% endif %}
+{% if request.query_params.get('error') == 'batch_assign_invalid_teacher' %}
+<div class="alert alert-error">指定的老師帳號無效。</div>
+{% endif %}
+{% if request.query_params.get('batch_assigned') == '1' %}
+<div class="alert alert-success">已更新勾選問卷的負責檢閱老師。</div>
+{% endif %}
+
+{% if is_super_user and submissions and not reviewer_options %}
+<div class="alert alert-error" style="margin-bottom: 16px;">目前沒有可指派為「負責檢閱」的帳號。請先到「管理使用者」將帳號升級為老師。</div>
+{% endif %}
+
+{% if is_super_user and submissions and reviewer_options %}
+<form id="batchAssignForm" method="post" action="/teacher/submissions/batch-assign" class="card" style="padding: 16px 20px; margin-bottom: 16px;">
+  <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+    <span style="font-weight: 600;">批次指定負責檢閱老師</span>
+    <select name="assign_teacher_id" class="form-input" style="max-width: 280px; width: 100%;" required>
+      <option value="">— 選擇老師 —</option>
+      {% for t in reviewer_options %}
+      <option value="{{ t.id }}">{{ t.name or t.email }}（{{ t.email }}）</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-sm btn-primary"
+            onclick="return confirm('確定將勾選的問卷批次指派給所選老師？');">套用</button>
+  </div>
+  <p style="margin-top: 10px; font-size: 14px; color: var(--text-light);">請在下方列表勾選問卷（勾選框與此表單連動）。</p>
+</form>
+{% endif %}
 
 {% if not submissions %}
 <div class="card empty-state">
-  <p>&#x1F4ED; 目前還沒有學生作答</p>
+  {% if is_super_user %}
+  <p>&#x1F4ED; 目前還沒有任何學生作答</p>
   <p style="font-size: 15px; margin-top: 8px;">學生提交練習後，就會出現在這裡</p>
+  {% else %}
+  <p>&#x1F4ED; 目前沒有指派給您檢閱的問卷</p>
+  <p style="font-size: 15px; margin-top: 8px;">請由 super user 分配，或由您以老師身分代學生填寫問卷（會自動歸您檢閱）</p>
+  {% endif %}
 </div>
 {% else %}
 <div class="card">
@@ -26,8 +66,12 @@
     <table>
       <thead>
         <tr>
+          {% if is_super_user and reviewer_options %}
+          <th style="width: 40px;"></th>
+          {% endif %}
           <th>學生</th>
           <th>練習類型</th>
+          <th>負責檢閱</th>
           <th>提交時間</th>
           <th>狀態</th>
           <th>AI 評等</th>
@@ -38,8 +82,20 @@
       <tbody>
         {% for item in submissions %}
         <tr>
+          {% if is_super_user and reviewer_options %}
+          <td>
+            <input type="checkbox" name="submission_ids" value="{{ item.submission.id }}" form="batchAssignForm">
+          </td>
+          {% endif %}
           <td><strong>{{ item.submission.student_name }}</strong></td>
           <td>{{ item.questionnaire_name }}</td>
+          <td>
+            {% if item.assignee %}
+              {{ item.assignee.name or item.assignee.email }}
+            {% else %}
+              <span class="badge badge-muted">未分配</span>
+            {% endif %}
+          </td>
           <td>{{ item.submission.created_at.strftime('%m/%d %H:%M') }}</td>
           <td>
             {% if item.submission.status == "completed" %}

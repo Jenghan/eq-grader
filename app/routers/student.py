@@ -3,26 +3,42 @@ from fastapi import APIRouter, Request, Depends, BackgroundTasks
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 
+from app.config import settings
 from app.database import get_session, engine
-from app.models import StudentSubmission, AIEvaluation
+from app.models import StudentSubmission, AIEvaluation, User
+from app.routers.auth import get_current_user
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
+def _student_form_extra(session: Session, request: Request) -> dict:
+    extra = {"oauth_enabled": settings.google_oauth_enabled, "reviewer_filling": False}
+    if not settings.google_oauth_enabled:
+        return extra
+    cu = get_current_user(request)
+    if not cu:
+        return extra
+    db_u = session.get(User, cu["id"])
+    if db_u and db_u.role in {"teacher", "super_user"}:
+        extra["reviewer_filling"] = True
+    return extra
+
+
 @router.get("/")
-async def index(request: Request):
+async def index(request: Request, session: Session = Depends(get_session)):
     from app.main import app_state
     questionnaires = app_state["questionnaires"]
     return templates.TemplateResponse("student_form.html", {
         "request": request,
         "questionnaires": questionnaires,
         "questionnaire": None,
+        **_student_form_extra(session, request),
     })
 
 
 @router.get("/questionnaire/{q_id}")
-async def questionnaire_form(request: Request, q_id: str):
+async def questionnaire_form(request: Request, q_id: str, session: Session = Depends(get_session)):
     from app.main import app_state
     questionnaires = app_state["questionnaires"]
     q = questionnaires.get(q_id)
@@ -32,6 +48,7 @@ async def questionnaire_form(request: Request, q_id: str):
             "questionnaires": questionnaires,
             "questionnaire": None,
             "error": "找不到這份問卷",
+            **_student_form_extra(session, request),
         })
 
     fixed_slots = {}
@@ -45,6 +62,7 @@ async def questionnaire_form(request: Request, q_id: str):
         "questionnaires": questionnaires,
         "questionnaire": q,
         "fixed_slots": fixed_slots,
+        **_student_form_extra(session, request),
     })
 
 
@@ -67,15 +85,25 @@ async def submit_answer(
             "questionnaires": questionnaires,
             "questionnaire": q,
             "error": "請填寫姓名並選擇問卷",
+            **_student_form_extra(session, request),
         })
 
     answers = _parse_form_answers(form, q)
+
+    assigned_teacher_id: str | None = None
+    if settings.google_oauth_enabled:
+        cu = get_current_user(request)
+        if cu:
+            db_u = session.get(User, cu["id"])
+            if db_u and db_u.role in {"teacher", "super_user"}:
+                assigned_teacher_id = db_u.id
 
     submission = StudentSubmission(
         questionnaire_id=q_id,
         student_name=student_name,
         raw_answer=json.dumps(answers, ensure_ascii=False),
         status="grading",
+        assigned_teacher_id=assigned_teacher_id,
     )
     session.add(submission)
     session.commit()

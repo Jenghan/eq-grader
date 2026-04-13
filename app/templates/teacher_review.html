@@ -16,6 +16,14 @@
   {% if submission.status == "grading" %}
   <p style="margin-top: 10px; color: var(--text-light); font-size: 15px;">正在以目前系統設定的模型重新批改，完成後請重新整理頁面。</p>
   {% endif %}
+  <p style="margin-top: 8px; font-size: 15px; color: var(--text-light);">
+    負責檢閱：
+    {% if assignee %}
+      <strong>{{ assignee.name or assignee.email }}</strong>（{{ assignee.email }}）
+    {% else %}
+      <span class="badge badge-muted">尚未分配</span>
+    {% endif %}
+  </p>
 </div>
 
 <div class="section">
