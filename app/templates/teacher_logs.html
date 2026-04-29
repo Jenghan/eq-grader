@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}系統紀錄{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>&#x1F4CB; 系統紀錄（Log Viewer）</h1>
+  <p>僅 super user 可檢視。日誌每日 rotate，保留最近 30 天。</p>
+</div>
+
+<div class="card" style="margin-bottom: 14px;">
+  <form method="get" action="/teacher/logs" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+    <label for="file"><strong>檔案：</strong></label>
+    <select id="file" name="file" class="form-input" style="max-width: 360px;">
+      {% for f in log_files %}
+      <option value="{{ f }}" {% if f == selected_file %}selected{% endif %}>{{ f }}</option>
+      {% endfor %}
+    </select>
+    <label for="per_page"><strong>每頁：</strong></label>
+    <select id="per_page" name="per_page" class="form-input" style="max-width: 120px;">
+      {% for n in [50, 100, 200, 300] %}
+      <option value="{{ n }}" {% if n == per_page %}selected{% endif %}>{{ n }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-sm btn-primary">套用</button>
+  </form>
+</div>
+
+{% if not log_files %}
+<div class="card empty-state">
+  <p>目前還沒有可讀取的系統 log 檔案。</p>
+</div>
+{% else %}
+<div class="card">
+  <div style="margin-bottom: 10px; color: var(--text-light); font-size: 14px;">
+    檔案：<strong>{{ selected_file }}</strong> ｜ 共 {{ total_lines }} 行 ｜ 第 {{ page }} / {{ total_pages }} 頁
+  </div>
+  <pre style="white-space: pre-wrap; background: #f8f7f5; border: 1px solid var(--border); border-radius: 8px; padding: 12px; max-height: 560px; overflow: auto;">{% for line in entries %}{{ line }}
+{% endfor %}</pre>
+</div>
+
+<div class="card" style="padding: 14px 18px;">
+  <div style="display: flex; gap: 10px; align-items: center;">
+    {% if page > 1 %}
+      <a class="btn btn-sm btn-secondary" href="/teacher/logs?file={{ selected_file }}&per_page={{ per_page }}&page={{ page - 1 }}">上一頁</a>
+    {% endif %}
+    {% if page < total_pages %}
+      <a class="btn btn-sm btn-secondary" href="/teacher/logs?file={{ selected_file }}&per_page={{ per_page }}&page={{ page + 1 }}">下一頁</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

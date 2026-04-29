@@ -7,6 +7,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
 from app.database import create_db_and_tables
+from app.logging_setup import setup_logging
 from app.llm.client import OllamaClient
 from app.llm.gemini_client import GeminiClient
 from app.llm.pipeline import GradingPipeline
@@ -18,6 +19,7 @@ app_state: dict = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    setup_logging()
     settings.load_questionnaires()
     create_db_and_tables()
 

@@ -109,6 +109,23 @@
   </div>
 </div>
 
+{% if submission.status == "error" and error_detail %}
+<div class="section">
+  <div class="section-title">&#x26A0;&#xFE0F; 錯誤細節</div>
+  <div class="card">
+    <p style="color: var(--text-light); margin-bottom: 10px;">
+      此筆批改失敗，以下是系統記錄的錯誤資訊（可提供給管理員排查）。
+    </p>
+    <pre style="white-space: pre-wrap; background: #f8f7f5; border: 1px solid var(--border); border-radius: 8px; padding: 12px; max-height: 320px; overflow: auto;">{{ error_detail }}</pre>
+    {% if is_super_user %}
+    <p style="margin-top: 10px; font-size: 14px; color: var(--text-light);">
+      你也可以前往「系統紀錄」頁查看完整 log 與 traceback。
+    </p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
 {# === AI 分析（預設收合，點擊展開） === #}
 {% if self_reflection or scores %}
 <div class="section">

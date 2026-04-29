@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from fastapi import APIRouter, Request, Depends, Form, BackgroundTasks
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -27,6 +28,15 @@ def _list_assignable_teachers(session: Session) -> list[User]:
     cand = [u for u in users if u.role in {"teacher", "super_user"}]
     cand.sort(key=lambda u: ((u.name or u.email or "").lower(), (u.email or "").lower()))
     return cand
+
+
+def _list_log_files() -> list[str]:
+    log_dir = Path(settings.log_dir)
+    if not log_dir.exists():
+        return []
+    files = [p.name for p in log_dir.glob(f"{settings.log_file_name}*") if p.is_file()]
+    files.sort(reverse=True)
+    return files
 
 
 @router.get("")
@@ -102,6 +112,73 @@ async def user_list(
         "oauth_enabled": settings.google_oauth_enabled,
         "is_super_user": True,
         "super_user_email": settings.super_user_email,
+    })
+
+
+@router.get("/logs")
+async def logs_viewer(
+    request: Request,
+    file: str | None = None,
+    page: int = 1,
+    per_page: int = 100,
+    session: Session = Depends(get_session),
+):
+    if not settings.google_oauth_enabled:
+        return RedirectResponse(url="/teacher", status_code=303)
+
+    user = require_super_user(request, session)
+    log_files = _list_log_files()
+    if not log_files:
+        return templates.TemplateResponse("teacher_logs.html", {
+            "request": request,
+            "user": user,
+            "is_super_user": True,
+            "oauth_enabled": settings.google_oauth_enabled,
+            "log_files": [],
+            "selected_file": None,
+            "page": 1,
+            "per_page": per_page,
+            "total_pages": 1,
+            "total_lines": 0,
+            "entries": [],
+        })
+
+    selected_file = file if file in log_files else log_files[0]
+    log_path = Path(settings.log_dir) / selected_file
+    if not log_path.exists():
+        selected_file = log_files[0]
+        log_path = Path(settings.log_dir) / selected_file
+
+    per_page = max(20, min(per_page, 300))
+    page = max(1, page)
+
+    try:
+        all_lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except Exception:
+        all_lines = []
+
+    # Show newest entries first.
+    all_lines.reverse()
+    total_lines = len(all_lines)
+    total_pages = max((total_lines + per_page - 1) // per_page, 1)
+    if page > total_pages:
+        page = total_pages
+    start = (page - 1) * per_page
+    end = start + per_page
+    entries = all_lines[start:end]
+
+    return templates.TemplateResponse("teacher_logs.html", {
+        "request": request,
+        "user": user,
+        "is_super_user": True,
+        "oauth_enabled": settings.google_oauth_enabled,
+        "log_files": log_files,
+        "selected_file": selected_file,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+        "total_lines": total_lines,
+        "entries": entries,
     })
 
 
@@ -184,6 +261,7 @@ async def review(
 
     self_reflection = {}
     scores = {}
+    error_detail = ""
     if evaluation:
         try:
             self_reflection = json.loads(evaluation.student_self_reflection) if evaluation.student_self_reflection else {}
@@ -193,6 +271,17 @@ async def review(
             scores = json.loads(evaluation.teacher_scores) if evaluation.teacher_scores else {}
         except json.JSONDecodeError:
             pass
+        if submission.status == "error" and evaluation.raw_llm_output:
+            try:
+                raw = json.loads(evaluation.raw_llm_output)
+                if isinstance(raw, dict):
+                    tb = raw.get("traceback", "")
+                    err = raw.get("error", "")
+                    error_detail = tb or err or evaluation.raw_llm_output
+                else:
+                    error_detail = str(raw)
+            except json.JSONDecodeError:
+                error_detail = evaluation.raw_llm_output
 
     return templates.TemplateResponse("teacher_review.html", {
         "request": request,
@@ -206,6 +295,7 @@ async def review(
         "is_super_user": user.get("role") == "super_user",
         "oauth_enabled": settings.google_oauth_enabled,
         "assignee": assignee,
+        "error_detail": error_detail,
     })
 
 

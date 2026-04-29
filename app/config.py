@@ -25,6 +25,8 @@ class Settings:
     app_base_url: str = field(default_factory=lambda: os.getenv("APP_BASE_URL", "http://localhost:8000"))
     session_secret: str = field(default_factory=lambda: os.getenv("SESSION_SECRET", "change-me-to-a-random-string"))
     super_user_email: str = field(default_factory=lambda: os.getenv("SUPER_USER_EMAIL", "jenghan.hsieh@gmail.com").strip().lower())
+    log_dir: str = field(default_factory=lambda: os.getenv("LOG_DIR", "logs"))
+    log_file_name: str = field(default_factory=lambda: os.getenv("LOG_FILE_NAME", "eq-grader.log"))
 
     # Questionnaires
     questionnaires_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent / "questionnaires")

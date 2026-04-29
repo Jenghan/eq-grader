@@ -1,4 +1,6 @@
 import json
+import logging
+import traceback
 from fastapi import APIRouter, Request, Depends, BackgroundTasks
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
@@ -10,6 +12,7 @@ from app.routers.auth import get_current_user
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+logger = logging.getLogger(__name__)
 
 
 def _student_form_extra(session: Session, request: Request) -> dict:
@@ -196,10 +199,19 @@ async def _grade_submission(submission_id: str, questionnaire_id: str, answers: 
             submission.status = "completed"
         except Exception as e:
             submission.status = "error"
+            logger.exception(
+                "AI grading failed | submission_id=%s questionnaire_id=%s student_name=%s",
+                submission.id,
+                questionnaire_id,
+                submission.student_name,
+            )
             evaluation = AIEvaluation(
                 submission_id=submission.id,
                 teacher_comment=f"AI 評分時發生錯誤，請老師手動批改。錯誤: {str(e)[:200]}",
-                raw_llm_output=json.dumps({"error": str(e)}, ensure_ascii=False),
+                raw_llm_output=json.dumps({
+                    "error": str(e),
+                    "traceback": traceback.format_exc(),
+                }, ensure_ascii=False),
             )
             session.add(evaluation)
 
@@ -244,8 +256,20 @@ async def _regrade_submission(submission_id: str) -> None:
 
         try:
             result = await pipeline.grade(q_id, answers)
-        except Exception:
+        except Exception as e:
+            logger.exception(
+                "AI regrade failed | submission_id=%s questionnaire_id=%s student_name=%s",
+                submission.id,
+                q_id,
+                submission.student_name,
+            )
             submission.status = "error"
+            evaluation.teacher_comment = f"AI 重新批改時發生錯誤，請稍後再試。錯誤: {str(e)[:200]}"
+            evaluation.raw_llm_output = json.dumps({
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+            }, ensure_ascii=False)
+            session.add(evaluation)
             session.add(submission)
             session.commit()
             return
